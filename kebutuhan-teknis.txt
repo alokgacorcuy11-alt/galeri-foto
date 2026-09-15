@@ -1,0 +1,44 @@
+DAFTAR KEBUTUHAN TEKNIS DAN SPESIFIKASI PERANGKAT
+UKK RPL 2023/2024 - Paket 3: Website Galeri Foto
+
+A. PERANGKAT KERAS (HARDWARE)
+No | Nama | Spesifikasi Minimal | Jumlah
+1  | Komputer Server (PC/Laptop) | Prosesor Dual Core 2,4 GHz, RAM 2 GB, Keyboard, Mouse, Monitor | 1 Unit
+2  | Komputer Client (PC/Laptop) | Prosesor Dual Core 2,4 GHz, RAM 2 GB, Keyboard, Mouse, Monitor | 1 Unit
+3  | Smartphone | Android / iOS | 1 Unit
+4  | Koneksi Internet | Minimal 1 Mbps | -
+
+B. PERANGKAT LUNAK (SOFTWARE)
+No | Nama | Fungsi
+1  | XAMPP (Apache + MySQL + PHP) | Server lokal untuk menjalankan aplikasi
+2  | PHP 7.4+ (mysqli, fileinfo) | Bahasa pemrograman server-side
+3  | MySQL/MariaDB | Database penyimpanan data user & foto
+4  | VS Code | Text editor untuk menulis kode
+5  | Google Chrome | Browser untuk testing aplikasi
+
+C. KEBUTUHAN TEKNIS APLIKASI
+1. Transisi halaman: animasi fade masuk saat buka fitur, fade keluar saat pindah/kembali (tanpa loading page)
+2. Dashboard: Admin melihat statistik global (foto, pengguna, like, komentar); User melihat statistik pribadi - kedua role teruji
+3. Aplikasi berbasis client-server (browser client -> Apache+PHP+MySQL server)
+4. Autentikasi: login, logout, registrasi dengan hash password (bcrypt)
+3. Level pengguna: enum("Admin", "User") - hapus foto hanya Admin
+4. CRUD foto: tambah, edit, lihat (galeri + detail), hapus (Admin)
+   - Edit: hanya pemilik foto (pengupload) yang boleh ubah; akun lain tidak ada tombol Edit
+5. Search: pencarian berdasarkan judul, deskripsi, nama uploader
+6. Download: fasilitas unduh gambar dari galeri
+7. Upload: validasi ekstensi (jpg, jpeg, png, gif, webp) maks 5 MB
+8. Keamanan: prepared statement (anti SQL injection), htmlspecialchars (anti XSS)
+9. UI/UX: tema glassmorphism (kartu kaca + langit malam lavender), ikon SVG, responsive
+10. Login: eye-toggle password, Remember Me 30 hari (cookie + token hash), tombol akun demo
+10. Like: toggle suka/batal (1 user = 1 like per foto)
+11. Komentar: tulis komentar pada foto, tampil dengan waktu relatif
+12. Share: bagikan ke WhatsApp, Telegram, Instagram, dan salin link
+13. Album: buat/edit/hapus album; foto dimasukkan via dropdown; hapus album tidak hapus foto
+
+D. SPESIFIKASI DATABASE (db_galeri_foto)
+- Tabel users: id, username, password(hash), nama_lengkap, level enum("Admin","User"), created_at
+- Tabel photos: id, user_id(FK), judul, deskripsi, filename, created_at
+- Tabel likes: id, photo_id(FK), user_id(FK), created_at, UNIQUE(photo_id, user_id)
+- Tabel comments: id, photo_id(FK), user_id(FK), isi varchar(500), created_at
+- Tabel albums: id, user_id(FK), nama, deskripsi, created_at
+  (photos.album_id FK nullable, ON DELETE SET NULL)

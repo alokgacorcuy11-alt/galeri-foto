@@ -1,0 +1,6 @@
+# Foto/vid user jangan masuk repo (di-upload ulang manual di hosting)
+# Struktur folder tetap ikut via .gitkeep
+/uploads/*
+!/uploads/.gitkeep
+/uploads/avatars/*
+!/uploads/avatars/.gitkeep
