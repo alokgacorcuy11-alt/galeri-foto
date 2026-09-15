@@ -3,23 +3,51 @@
 // Jalankan SEKALI untuk membuat database, tabel, dan akun default.
 // Setelah selesai, HAPUS file ini dari server.
 
-// Konfigurasi (harus sama dengan includes/config.php)
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'db_galeri_foto');
+// Tampilkan error apa adanya (hosting mematikan display_errors sehingga
+// kegagalan terlihat seperti halaman berhenti diam-diam).
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+
+// Kredensial ikut includes/config.php (sama di XAMPP maupun hosting).
+// Dibaca manual (tidak di-require) supaya instalasi tetap jalan walau DB belum ada.
+$cfgSrc = file_get_contents(__DIR__ . '/includes/config.php');
+$dbKred = [];
+foreach (['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'] as $kunci) {
+    if (!preg_match("/define\\('" . $kunci . "', '(.*?)'\\)/", $cfgSrc, $cocok)) {
+        die('Tidak bisa membaca ' . $kunci . ' dari includes/config.php');
+    }
+    $dbKred[$kunci] = $cocok[1];
+}
 
 echo '<h2>Instalasi NoxGallery (Website Galeri Foto)</h2><pre>';
 
-// 1. Koneksi TANPA memilih database dulu (karena database belum ada)
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS);
+// 1. Koneksi TANPA memilih database dulu (database mungkin belum ada).
+// try/catch karena PHP 8.1+ melempar exception (bukan connect_error) saat gagal.
+try {
+    $conn = new mysqli($dbKred['DB_HOST'], $dbKred['DB_USER'], $dbKred['DB_PASS']);
+} catch (mysqli_sql_exception $e) {
+    die('Koneksi gagal: ' . $e->getMessage() . ' (cek kredensial di includes/config.php)');
+}
 if ($conn->connect_error) {
-    die('Koneksi gagal: ' . $conn->connect_error);
+    die('Koneksi gagal: ' . $conn->connect_error . ' (cek kredensial di includes/config.php)');
 }
 
-// 2. Buat database
-$conn->query('CREATE DATABASE IF NOT EXISTS ' . DB_NAME . ' CHARACTER SET utf8mb4');
-$conn->select_db(DB_NAME);
+// 2. Buat database. Di hosting gratis ini biasanya ditolak (tanpa hak) - tidak apa,
+// karena database sudah dibuat via panel; lanjutkan saja.
+// (try/catch karena PHP 8.1+ melempar exception, bukan return false)
+try {
+    $conn->query('CREATE DATABASE IF NOT EXISTS ' . $dbKred['DB_NAME'] . ' CHARACTER SET utf8mb4');
+} catch (mysqli_sql_exception $e) {
+    echo "(Lewati buat database: tanpa hak akses, pakai database panel.)\n";
+}
+try {
+    $okDb = $conn->select_db($dbKred['DB_NAME']);
+} catch (mysqli_sql_exception $e) {
+    $okDb = false;
+}
+if (!$okDb) {
+    die('Database ' . $dbKred['DB_NAME'] . ' tidak ditemukan. Buat dulu via panel hosting, lalu jalankan install.php lagi.');
+}
 
 // 3. Buat tabel users
 $sqlUsers = 'CREATE TABLE IF NOT EXISTS users (
@@ -81,42 +109,20 @@ if ($cekKolom && $cekKolom->num_rows === 0) {
 $conn->query('ALTER TABLE users ADD COLUMN verified TINYINT(1) NOT NULL DEFAULT 0');
 echo "Kolom verified ditambahkan (migrasi).\n";
 }
-// 3c7. Migrasi: tipe notif follow + verified (abaikan bila gagal = versi lama)
+// 3c7. Migrasi: tipe notif follow + verified.
+// Guard tabel dulu: di instalasi baru tabelnya belum ada (dibuat di 3d di bawah),
+// dan PHP 8.1+ melempar exception untuk query gagal (tidak bisa diabaikan begitu saja).
+$cekNotif = $conn->query("SHOW TABLES LIKE 'notifications'");
+if ($cekNotif && $cekNotif->num_rows > 0) {
 $conn->query("ALTER TABLE notifications MODIFY tipe ENUM('banned','unbanned','photo_deleted','follow','verified') NOT NULL DEFAULT 'photo_deleted'");
+}
 // 3c8. Migrasi: tipe notif comment + like, kolom views + pinned di photos
+if ($cekNotif && $cekNotif->num_rows > 0) {
 $conn->query("ALTER TABLE notifications MODIFY tipe ENUM('banned','unbanned','photo_deleted','follow','verified','comment','like') NOT NULL DEFAULT 'photo_deleted'");
-$cekKolom = $conn->query("SHOW COLUMNS FROM photos LIKE 'views'");
-if ($cekKolom && $cekKolom->num_rows === 0) {
-$conn->query('ALTER TABLE photos ADD COLUMN views INT NOT NULL DEFAULT 0, ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0');
-echo "Kolom views + pinned ditambahkan (migrasi).\n";
 }
-// 3e. Tabel saved (simpanan) + reposts (posting ulang) + follows (pengikut):
-// kunci ganda, CASCADE dua arah agar ikut hilang saat akun/foto dihapus
-$sqlFollow = 'CREATE TABLE IF NOT EXISTS follows (
-follower_id INT NOT NULL,
-following_id INT NOT NULL,
-created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-PRIMARY KEY (follower_id, following_id),
-FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
-FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
-if (!$conn->query($sqlFollow)) {
-die('Gagal membuat tabel follows: ' . $conn->error);
-}
-echo "Tabel follows siap.\n";
-foreach (['saved', 'reposts'] as $tabelRelasi) {$sqlRelasi = "CREATE TABLE IF NOT EXISTS $tabelRelasi (
-user_id INT NOT NULL,
-photo_id INT NOT NULL,
-created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-PRIMARY KEY (user_id, photo_id),
-FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-if (!$conn->query($sqlRelasi)) {
-die('Gagal membuat tabel ' . $tabelRelasi . ': ' . $conn->error);
-}
-echo "Tabel $tabelRelasi siap.\n";
-}
+// (migrasi views+pinned dipindah ke 5c di bawah, setelah tabel photos dijamin ada)
+// (tabel relasi follows/saved/reposts dipindah ke 4d di bawah: FK-nya menunjuk
+// tabel photos yang pada instalasi baru belum ada di titik ini)
 if (!is_dir(__DIR__ . '/uploads/avatars')) {
 mkdir(__DIR__ . '/uploads/avatars', 0755, true);
 echo "Folder uploads/avatars dibuat.\n";
@@ -160,6 +166,8 @@ $sqlPhotos = 'CREATE TABLE IF NOT EXISTS photos (
     judul VARCHAR(100) NOT NULL,
     deskripsi TEXT,
     filename VARCHAR(255) NOT NULL,
+    views INT NOT NULL DEFAULT 0,
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL
@@ -176,6 +184,14 @@ if ($cekAlbum && $cekAlbum->num_rows === 0) {
     $conn->query('ALTER TABLE photos ADD COLUMN album_id INT NULL DEFAULT NULL AFTER user_id');
     $conn->query('ALTER TABLE photos ADD CONSTRAINT fk_photos_album FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL');
     echo "Kolom album_id ditambahkan (migrasi).\n";
+}
+
+// 5c. Migrasi: kolom views + pinned (di sini karena tabel photos baru dijamin ada;
+// di atas tidak aman: instalasi baru belum punya tabel photos dan PHP 8.1+ melempar exception)
+$cekViews = $conn->query("SHOW COLUMNS FROM photos LIKE 'views'");
+if ($cekViews && $cekViews->num_rows === 0) {
+$conn->query('ALTER TABLE photos ADD COLUMN views INT NOT NULL DEFAULT 0, ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0');
+echo "Kolom views + pinned ditambahkan (migrasi).\n";
 }
 
 // 4b. Buat tabel likes (satu user = satu like per foto)
@@ -209,6 +225,34 @@ if (!$conn->query($sqlComments)) {
     die('Gagal membuat tabel comments: ' . $conn->error);
 }
 echo "Tabel comments dibuat.\n";
+
+// 4d. Tabel relasi follows/saved/reposts: di sini karena FK-nya menunjuk tabel photos
+// yang baru dijamin ada; kunci ganda + CASCADE dua arah
+$sqlFollow = 'CREATE TABLE IF NOT EXISTS follows (
+follower_id INT NOT NULL,
+following_id INT NOT NULL,
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (follower_id, following_id),
+FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
+if (!$conn->query($sqlFollow)) {
+die('Gagal membuat tabel follows: ' . $conn->error);
+}
+echo "Tabel follows siap.\n";
+foreach (['saved', 'reposts'] as $tabelRelasi) {$sqlRelasi = "CREATE TABLE IF NOT EXISTS $tabelRelasi (
+user_id INT NOT NULL,
+photo_id INT NOT NULL,
+created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (user_id, photo_id),
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+if (!$conn->query($sqlRelasi)) {
+die('Gagal membuat tabel ' . $tabelRelasi . ': ' . $conn->error);
+}
+echo "Tabel $tabelRelasi siap.\n";
+}
 
 // 5. Insert akun default jika belum ada
 $cek = $conn->query('SELECT COUNT(*) AS total FROM users');
