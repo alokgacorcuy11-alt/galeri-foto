@@ -146,3 +146,11 @@ Arah desain disepakati pemilik produk (siswa) bersama referensinya; file ini ala
   Alat admin (Dashboard, Pengguna) jadi ikon only-mobile di top bar agar tak hilang.
 - Safe-area poni (env) + body padding + toast diangkat di atas nav; toast tetap terlihat.
 - Desktop tidak berubah (bottom nav display:none, dibuktikan regresi 1280px).
+
+## Penataan mobile gelombang terakhir
+- Latar bintang dipaksa position:fixed (dipaku, tidak bergeser) + kartu/nav dipadatkan
+  (alpha .85-.93) supaya tidak terlihat buram tembus; desktop tetap.
+- Chip filter tidak lagi menumpuk: tiap grup satu baris bisa digeser (scroll-x). Di hosting,
+  quirks mode membuat stretch kolom gagal, jadi lebar kunci eksplisit width:100%.
+- Aksi kartu diringkas ala TikTok: like, komentar, share, dan menu "..." (unduh/simpan/edit/hapus)
+  berisi panel kaca; di desktop panel melebur jadi deretan tombol seperti semula (display:contents).

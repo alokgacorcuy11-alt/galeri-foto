@@ -76,37 +76,35 @@ layout_header($photo['judul']);
                     <?= icon('download', 21) ?>
                     <span class="rail-count">Unduh</span>
                 </a>
-                <form method="post" action="save.php" class="action-like-form">
-                    <input type="hidden" name="photo_id" value="<?= $id ?>">
-                    <input type="hidden" name="back" value="detail.php">
-                    <button type="submit" class="rail-btn save <?= $sudahSimpan ? 'active' : '' ?>"
-                            title="<?= $sudahSimpan ? 'Hapus dari simpanan' : 'Simpan foto' ?>"
-                            aria-pressed="<?= $sudahSimpan ? 'true' : 'false' ?>">
-                        <?= icon('bookmark', 20) ?>
-                        <span class="rail-count">Simpan</span>
+                <div class="more-wrap">
+                    <button type="button" class="rail-btn more-btn" aria-label="Opsi lainnya" aria-expanded="false" title="Opsi lainnya">
+                        <?= icon('dots', 21) ?>
+                        <span class="rail-count">Lainnya</span>
                     </button>
-                </form>
-                <?php /* Edit: hanya pemilik foto yang mengupload */ ?>
-                <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
-                <a href="edit.php?id=<?= $id ?>" class="rail-btn" title="Edit foto">
-                    <?= icon('edit', 20) ?>
-                    <span class="rail-count">Edit</span>
-                </a>
-                <form method="post" action="pin.php" class="action-like-form">
-                    <input type="hidden" name="photo_id" value="<?= $id ?>">
-                    <button type="submit" class="rail-btn" title="<?= (int)$photo['pinned'] === 1 ? 'Lepas sematan' : 'Sematkan ke profil' ?>">
-                        <?= icon('pin', 20) ?>
-                        <span class="rail-count"><?= (int)$photo['pinned'] === 1 ? 'Disemat' : 'Sematkan' ?></span>
-                    </button>
-                </form>
-                <?php endif; ?>
-<?php if (isAdmin()): ?>
-<button type="button" class="rail-btn danger" data-del-id="<?= $id ?>" data-del-judul="<?= e($photo['judul']) ?>"
-        title="Hapus foto">
-<?= icon('trash', 20) ?>
-<span class="rail-count">Hapus</span>
-</button>
-<?php endif; ?>
+                    <div class="more-panel">
+                        <form method="post" action="save.php" class="action-like-form">
+                            <input type="hidden" name="photo_id" value="<?= $id ?>">
+                            <input type="hidden" name="back" value="detail.php">
+                            <button type="submit" class="action-btn save <?= $sudahSimpan ? 'active' : '' ?>"
+                                    title="<?= $sudahSimpan ? 'Hapus dari simpanan' : 'Simpan foto' ?>"
+                                    aria-pressed="<?= $sudahSimpan ? 'true' : 'false' ?>"><?= icon('bookmark', 16) ?> <span><?= $sudahSimpan ? 'Batal simpan' : 'Simpan' ?></span></button>
+                        </form>
+                        <?php /* Edit + semat: hanya pemilik foto */ ?>
+                        <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
+                        <a href="edit.php?id=<?= $id ?>" class="action-btn" title="Edit foto"><?= icon('edit', 15) ?> <span>Edit</span></a>
+                        <form method="post" action="pin.php" class="action-like-form">
+                            <input type="hidden" name="photo_id" value="<?= $id ?>">
+                            <button type="submit" class="action-btn" title="<?= (int)$photo['pinned'] === 1 ? 'Lepas sematan' : 'Sematkan ke profil' ?>">
+                                <?= icon('pin', 16) ?> <span><?= (int)$photo['pinned'] === 1 ? 'Lepas sematan' : 'Sematkan' ?></span>
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                        <?php if (isAdmin()): ?>
+                        <button type="button" class="action-btn danger" data-del-id="<?= $id ?>" data-del-judul="<?= e($photo['judul']) ?>"
+                                title="Hapus foto"><?= icon('trash', 15) ?> <span>Hapus</span></button>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
 
             <!-- Kolom kanan: info + komentar -->

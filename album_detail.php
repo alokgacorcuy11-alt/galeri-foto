@@ -25,14 +25,20 @@ if (!$album) {
     exit;
 }
 
-// Foto-foto dalam album ini
+// Foto-foto dalam album ini. Status like/simpan & jumlah dihitung sekali jalan
+// (nol query per kartu) - dua placeholder SELECT di depan, lalu id album.
+$viewerId = (int)$_SESSION['user_id'];
 $stmt = $koneksi->prepare(
-    'SELECT p.*, u.nama_lengkap
+    'SELECT p.*, u.nama_lengkap,
+            (SELECT COUNT(*) FROM likes l WHERE l.photo_id = p.id) AS jml_like,
+            (SELECT COUNT(*) FROM comments c WHERE c.photo_id = p.id) AS jml_komentar,
+            EXISTS (SELECT 1 FROM likes ul WHERE ul.photo_id = p.id AND ul.user_id = ?) AS sudah_like,
+            EXISTS (SELECT 1 FROM saved sl WHERE sl.photo_id = p.id AND sl.user_id = ?) AS sudah_simpan
      FROM photos p JOIN users u ON p.user_id = u.id
      WHERE p.album_id = ?
      ORDER BY p.created_at DESC'
 );
-$stmt->bind_param('i', $id);
+$stmt->bind_param('iii', $viewerId, $viewerId, $id);
 $stmt->execute();
 $photos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -78,14 +84,30 @@ layout_header($album['nama']);
             <?php $cardI = 0; ?>
             <?php foreach ($photos as $photo): ?>
                 <?php
-                    $jmlLike     = countLikes($photo['id']);
-                    $jmlKomentar = countComments($photo['id']);
-                    $sudahLike   = hasLiked($photo['id']);
+                    $jmlLike     = (int)$photo['jml_like'];
+                    $jmlKomentar = (int)$photo['jml_komentar'];
+                    $sudahLike   = (bool)$photo['sudah_like'];
+                    $sudahSimpan = (bool)$photo['sudah_simpan'];
                 ?>
                 <article class="photo-card" style="--card-i: <?= $cardI++ ?>">
-                    <a href="detail.php?id=<?= $photo['id'] ?>" class="photo-media">
-                        <img src="uploads/<?= e($photo['filename']) ?>" alt="<?= e($photo['judul']) ?>" loading="lazy">
-                    </a>
+                    <div class="photo-media">
+                        <a href="detail.php?id=<?= $photo['id'] ?>" class="photo-media-link">
+                            <img src="thumb.php?f=<?= urlencode($photo['filename']) ?>&w=640" alt="<?= e($photo['judul']) ?>" loading="lazy">
+                        </a>
+                        <?php /* Rail aksi melayang di foto (khusus HP, gaya TikTok) */ ?>
+                        <div class="photo-rail">
+                            <form method="post" action="like.php" class="action-like-form">
+                                <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
+                                <input type="hidden" name="back" value="index.php">
+                                <button type="submit" class="rail2 like <?= $sudahLike ? 'active' : '' ?>" title="Suka"><i><?= icon('heart', 20) ?></i><span><?= $jmlLike ?></span></button>
+                            </form>
+                            <a class="rail2" href="detail.php?id=<?= $photo['id'] ?>#komentar" title="Komentar"><i><?= icon('message', 20) ?></i><span><?= $jmlKomentar ?></span></a>
+                            <a class="rail2" href="download.php?id=<?= $photo['id'] ?>" title="Unduh"><i><?= icon('download', 20) ?></i></a>
+                            <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
+                                <a class="rail2" href="edit.php?id=<?= $photo['id'] ?>" title="Edit"><i><?= icon('edit', 19) ?></i></a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <div class="photo-body">
                         <h2 class="photo-title"><a href="detail.php?id=<?= $photo['id'] ?>"><?= e($photo['judul']) ?></a></h2>
                         <div class="photo-meta">

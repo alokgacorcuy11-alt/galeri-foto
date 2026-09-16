@@ -23,7 +23,7 @@ function layout_header(string $title, bool $auth = false): void
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="assets/favicon.png?v=2">
-    <link rel="stylesheet" href="assets/style.css?v=29">
+    <link rel="stylesheet" href="assets/style.css?v=50">
 </head>
 <body<?= $bodyClass ?>>
 <?php if (!$auth): ?>
@@ -74,7 +74,7 @@ function layout_header(string $title, bool $auth = false): void
         <a href="album.php" class="bnav-item <?= in_array($halaman, ['album.php', 'album_detail.php', 'album_edit.php'], true) ? 'active' : '' ?>"><?= icon('folder', 22) ?><span>Album</span></a>
         <a href="tambah.php" class="bnav-item bnav-create <?= $halaman === 'tambah.php' ? 'active' : '' ?>" aria-label="Tambah foto"><span class="bnav-plus"><?= icon('plus', 20) ?></span></a>
         <a href="pesan.php" class="bnav-item <?= $halaman === 'pesan.php' ? 'active' : '' ?>"><span class="bnav-icwrap"><?= icon('message', 22) ?><?php if (!empty($notifBaru)): ?><span class="nav-badge"><?= (int)$notifBaru ?></span><?php endif; ?></span><span>Pesan</span></a>
-        <a href="profil.php" class="bnav-item <?= in_array($halaman, ['profil.php', 'pengaturan.php'], true) ? 'active' : '' ?>"><?= userAvatar($_SESSION['avatar'] ?? null, $_SESSION['nama'] ?? '', 'bnav') ?><span>Profil</span></a>
+        <a href="profil.php" class="bnav-item <?= in_array($halaman, ['profil.php', 'pengaturan.php'], true) ? 'active' : '' ?>"><?= userAvatar($_SESSION['avatar'] ?? null, $_SESSION['nama'] ?? '', 'bnav-ava') ?><span>Profil</span></a>
     </div>
 </nav>
 <?php endif;
@@ -122,6 +122,33 @@ function layout_footer(): void
         });
     })();
 </script>
+    <script>
+        // Menu opsi "..." pada kartu/rail (mobile): buka/tutup panel; Esc & klik luar menutup
+        (function () {
+            var wraps = Array.prototype.slice.call(document.querySelectorAll('.more-wrap'));
+            if (!wraps.length) return;
+            function closeAll() {
+                wraps.forEach(function (w) {
+                    w.classList.remove('open');
+                    var b = w.querySelector('.more-btn');
+                    if (b) b.setAttribute('aria-expanded', 'false');
+                });
+            }
+            wraps.forEach(function (w) {
+                var btn = w.querySelector('.more-btn');
+                if (!btn) return;
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var wasOpen = w.classList.contains('open');
+                    closeAll();
+                    if (!wasOpen) { w.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+                });
+                w.addEventListener('click', function (e) { e.stopPropagation(); });
+            });
+            document.addEventListener('click', closeAll);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+        })();
+    </script>
 <script>
     // PIN 6 kotak ala dompet digital: satu digit per kotak, maju otomatis,
     // backspace mundur, tempel (paste) mengisi semua. Tidak jalan bila tidak ada widget.
@@ -208,5 +235,46 @@ function layout_toasts(): void
             });
         })();
     </script>
+    <script>
+        // Menu opsi "..." pada kartu/rail (mobile): buka/tutup panel; Esc & klik luar menutup
+        (function () {
+            var wraps = Array.prototype.slice.call(document.querySelectorAll('.more-wrap'));
+            if (!wraps.length) return;
+            function closeAll() {
+                wraps.forEach(function (w) {
+                    w.classList.remove('open');
+                    var b = w.querySelector('.more-btn');
+                    if (b) b.setAttribute('aria-expanded', 'false');
+                });
+            }
+            wraps.forEach(function (w) {
+                var btn = w.querySelector('.more-btn');
+                if (!btn) return;
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var wasOpen = w.classList.contains('open');
+                    closeAll();
+                    if (!wasOpen) { w.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+                });
+                w.addEventListener('click', function (e) { e.stopPropagation(); });
+            });
+            document.addEventListener('click', closeAll);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+        })();
+    </script>
     <?php
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -264,38 +264,33 @@ select.input option { background: #1c1630; color: var(--text); }
 }
 .toast {
   pointer-events: auto;
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px 14px;
-  background: rgba(23, 16, 41, .86);
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 13px;
+  background: rgba(18, 12, 38, .94);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
-  font-size: 13.5px; color: var(--text-2);
+  font-size: 13px;
   animation: toast-in .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 .toast.leaving { animation: toast-out .3s ease both; }
+/* Kotak ikon = tile tint per tipe, sama persis bahasa kartu notif di Pesan */
 .toast-iconbox {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0; margin-top: 1px;
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  border: none; background: var(--surface-2); color: var(--text-2);
 }
-.toast-success .toast-iconbox {
-  background: rgba(74, 222, 128, .13); color: var(--success);
-  border: 1px solid rgba(74, 222, 128, .35);
-}
-.toast-danger .toast-iconbox {
-  background: rgba(248, 113, 113, .14); color: var(--danger);
-  border: 1px solid rgba(248, 113, 113, .32);
-}
-.toast-warning .toast-iconbox {
-  background: rgba(250, 204, 21, .11); color: var(--warning);
-  border: 1px solid rgba(250, 204, 21, .28);
-}
-.toast-msg { flex: 1; line-height: 1.55; overflow-wrap: anywhere; }
+.toast-success .toast-iconbox { background: rgba(74, 222, 128, .14); color: var(--success); }
+.toast-danger .toast-iconbox { background: rgba(248, 113, 113, .14); color: var(--danger); }
+.toast-warning .toast-iconbox { background: rgba(250, 204, 21, .12); color: var(--warning); }
+.toast-msg { flex: 1; line-height: 1.5; color: var(--text); font-weight: 500; overflow-wrap: anywhere; }
 .toast-close {
   background: none; border: none; color: var(--text-3);
-  cursor: pointer; padding: 5px; display: inline-flex; border-radius: 7px;
-  transition: color .15s ease, background .15s ease; flex-shrink: 0; margin-top: -1px;
+  cursor: pointer; width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; flex-shrink: 0;
+  transition: color .15s ease, background .15s ease;
 }
 .toast-close:hover { color: var(--text); background: var(--surface-2); }
 @keyframes toast-in {
@@ -317,6 +312,7 @@ select.input option { background: #1c1630; color: var(--text); }
 .photo-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
 
 .photo-media { display: block; aspect-ratio: 4 / 3; overflow: hidden; background: var(--bg-elev); }
+.photo-media-link { display: block; width: 100%; height: 100%; }
 .photo-media img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
 .photo-card:hover .photo-media img { transform: scale(1.04); }
 
@@ -1122,9 +1118,205 @@ a.chip { text-decoration: none; }
   .bnav-create.active .bnav-plus { outline: 2px solid rgba(168, 85, 247, .55); outline-offset: 2px; }
   .bnav-icwrap { position: relative; display: inline-flex; }
   .bnav-icwrap .nav-badge { position: absolute; top: -7px; right: -14px; margin: 0; }
-  .avatar-img.bnav { width: 26px; height: 26px; }
-  .avatar.bnav { width: 26px; height: 26px; font-size: 10px; }
+.avatar-img.bnav-ava { width: 26px; height: 26px; }
+.avatar.bnav-ava { width: 26px; height: 26px; font-size: 10px; }
   /* Konten + toast lega dari nav bawah (termasuk poni HP) */
   body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
   .toast-stack { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- Perbaikan mobile (hosting inject script sebelum doctype -> quirks) ---------- */
+/* 1. Nav mentok atas: fixed (sticky terganggu quirks mode), konten diberi ruang. */
+/* 2. Latar bintang dipaku (fixed, tidak bergeser) + kartu/nav dibuat lebih solid
+      supaya tidak terlihat buram tembus pandang di HP. Desktop tetap seperti sekarang. */
+/* 3. Chip filter satu baris bisa digeser (tidak menumpuk ke bawah). */
+/* 4. Aksi kartu/rail diringkas: like, komentar, share + menu "..." (unduh/simpan/edit/hapus). */
+
+/* Menu opsi "..." - di desktop panel melebur (contents) jadi deretan tombol biasa */
+.more-wrap { display: contents; }
+.more-panel { display: contents; }
+.more-btn { display: none; }
+/* Desktop: ikon-only seperti semula; label hanya dipakai di panel mobile */
+.more-panel .action-btn span { display: none; }
+
+@media (max-width: 640px) {
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 95; }
+  body {
+    padding-top: 66px;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+  /* Latar bintang tetap ada tapi dipaku; permukaan kaca dipadatkan biar tidak "buram" */
+  body::before { position: fixed; }
+  .nav, .bnav { background: rgba(11, 6, 32, .93); }
+  .photo-card, .dash-card, .stat-card, .form-card, .detail-card, .feed-panel,
+  .empty, .notif-card, .user-row { background: rgba(24, 17, 46, .85); }
+
+  /* Kotak PIN menyesuaikan lebar kartu agar tidak meluber di 320px */
+  .pin-boxes { gap: 6px; }
+  .pin-boxes input { flex: 1 1 0; width: auto; min-width: 0; height: 48px; font-size: 18px; }
+
+/* Grup filter (HP): SATU baris chip yang bisa digeser (nowrap + scroll internal,
+   snap, bleed ke tepi layar) - bukan wrap yang jadi 4-5 baris berantakan.
+   Panel dropdown diposisikan fixed oleh JS supaya tidak terpotong wadah scroll;
+   fallback tanpa JS: panel absolute (tetap ter-scroll, opsi = link biasa). */
+.filter-bar {
+  flex-wrap: nowrap; align-items: center; gap: 6px;
+  width: auto; min-width: 0; position: relative;
+  margin: 0 -16px 18px; padding: 2px 16px 8px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-group, .filter-chips { display: contents; }
+.filter-label { display: none; }
+.fchip { flex: none; white-space: nowrap; scroll-snap-align: start; }
+.filter-side { display: contents; }
+.fselect { display: contents; }
+.fselect .fselect-btn { flex: none; }
+.fselect-panel { top: calc(100% + 4px); max-width: calc(100vw - 24px); z-index: 70; }
+.tag-row { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; margin-bottom: 20px; min-width: 0; }
+.tag-row::-webkit-scrollbar { display: none; }
+.tag-row .fchip { flex: none; }
+
+  /* Menu opsi jadi panel kaca kecil di atas tombol */
+  .more-wrap { display: inline-flex; position: relative; }
+  .more-btn { display: inline-flex; }
+  .more-panel {
+    display: none; position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 60;
+    flex-direction: column; gap: 2px; min-width: 190px;
+    background: #1c1630; border: 1px solid var(--border-strong); border-radius: 12px;
+    padding: 6px; box-shadow: 0 18px 44px rgba(0, 0, 0, .55);
+  }
+  .more-wrap.open .more-panel { display: flex; }
+  .more-panel form { width: 100%; }
+  .more-panel .action-btn {
+    width: 100%; justify-content: flex-start; gap: 10px;
+    border-color: transparent; background: transparent;
+  }
+  .more-panel .action-btn span { display: inline; }
+  .more-panel .action-btn:hover { background: rgba(255, 255, 255, .07); }
+}
+
+/* ---------- Compact mobile: halaman login, dialog, dan panel menu dikecilin ---------- */
+/* Ukuran tap target tetap >=44px (tap bukan digabung dengan kecilnya visual). */
+@media (max-width: 640px) {
+  .auth-logo-img { width: 54px; height: 54px; border-radius: 15px; }
+  .auth-card { padding: 20px 16px 18px; }
+  .auth-card h1, .auth-title { font-size: 17px; }
+  .auth-sub { font-size: 12.5px; margin: 6px 0 16px; }
+  .auth-card .field { margin-bottom: 14px; }
+  .auth-row { margin-bottom: 16px; }
+  .auth-card .btn { margin-top: 2px; }
+  .divider { margin: 16px 0 14px; }
+  .auth-alt { font-size: 12.5px; margin-top: 14px; }
+  .glass-dialog { padding: 16px 16px 14px; width: min(92vw, 400px); }
+  .dialog-title { font-size: 15.5px; }
+  .dialog-sub { font-size: 12px; margin-bottom: 10px; }
+  .dialog-actions { margin-top: 12px; }
+  .more-panel { min-width: 160px; padding: 4px; }
+  .fselect-panel { min-width: 160px; padding: 4px; }
+  .pin-boxes input { height: 44px; }
+}
+/* Tombol besar login tetap >=44px setelah compact */
+@media (max-width: 640px) {
+  .auth-card .btn { min-height: 46px; }
+}
+
+/* ---------- Rail aksi melayang di foto (HP, gaya TikTok) ---------- */
+/* Desktop: rail tak tampil, bar aksi bawah tetap seperti semula (nol perubahan).
+   HP: bar aksi bawah disembunyikan, ganti lingkaran kaca di kanan foto. */
+.photo-rail { display: none; }
+
+@media (max-width: 640px) {
+  /* Wrapper jadi relatif & boleh keluar (rail duduk di dalam photo-media).
+     Rasio 4:3 pakai padding hack - andal sampai iOS/Safari lama yang tak
+     mendukung aspect-ratio pada div (penyebab foto meluber + rail naik). */
+  .photo-media { position: relative; aspect-ratio: auto; overflow: visible; }
+  .photo-media-link { position: relative; height: 0; padding-top: 75%; overflow: hidden; }
+  .photo-media-link img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo-body .photo-actions { display: none; }
+  /* Rail aksi: DI BAWAH foto (baris horizontal), bukan overlay - konten foto
+     seperti screenshot chart tidak tertutup tombol. Titik-tiga tetap panel. */
+  .photo-rail {
+    display: flex; flex-direction: row; align-items: center; gap: 10px;
+    position: static; right: auto; bottom: auto; padding: 10px 10px 12px;
+  }
+  .rail2 span { white-space: nowrap; }
+  /* Label "Bagikan" pada share diganti angka repost saja; kalau 0 sembunyi */
+  .rail2.share-toggle span { display: none; }
+  .photo-rail form { display: contents; }
+  .photo-rail .more-wrap { position: relative; }
+  /* Panel membuka KE ATAS dari tombol (menimpa area foto) - bukan ke bawah yang
+     keluar kartu lalu ter-clip overflow. Batas tinggi aman untuk semua opsi. */
+  .photo-rail .more-panel { top: auto; bottom: calc(100% + 6px); right: 0; left: auto;
+    max-height: 214px; overflow-y: auto; }
+  .rail2 {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    background: rgba(11, 6, 32, .68); border: 1px solid var(--border);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    color: #fff; cursor: pointer; text-decoration: none; padding: 0;
+  }
+  .rail2 i { display: inline-flex; line-height: 0; }
+  .rail2 span { font-size: 10px; font-weight: 600; line-height: 1; margin-top: 1px; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+  .rail2:active { transform: scale(.92); }
+  .rail2.like.active { color: #f87171; border-color: rgba(248, 113, 113, .5); }
+  .rail2.like.active svg { fill: #f87171; }
+  .rail2.save.active { color: #d8b4fe; border-color: rgba(168, 85, 247, .55); }
+  .rail2.save.active svg { fill: #d8b4fe; }
+  /* (panel titik-tiga sudah ditata di blok rail di atas: membuka ke bawah) */
+}
+
+/* ---------- HP: kartu foto SATU kolom ---------- */
+/* Alasan: rail aksi vertikal butuh ~218px; dengan 2 kolom media hanya ~128px
+   tinggi sehingga tombol meluap keluar foto. Satu kolom = foto besar ala feed. */
+@media (max-width: 640px) {
+  .photo-grid { grid-template-columns: 1fr; gap: 16px; }
+}
+
+/* Rail HP: rapatkan gap supaya selalu muat vertikal di dalam foto (bahkan 320px) */
+@media (max-width: 640px) {
+  .photo-rail { gap: 8px; right: 6px; bottom: 6px; }
+}
+
+/* ---------- Kartu HP: compact feed ala Instagram ---------- */
+/* Alasan: crop 4:3 + rail lingkaran besar = kartu makan hampir 2 layar di 390px.
+   Foto dipotong 16:9, aksi jadi bar ramping ikon+angka sejajar (tetap tinggi 44px),
+   body dipadatkan. Desktop tidak tersentuh. */
+@media (max-width: 640px) {
+  .photo-grid { gap: 12px; }
+  .photo-media-link { padding-top: 56.25%; }
+  .photo-rail { padding: 0 4px 6px; gap: 2px; }
+  .rail2 {
+    width: auto; height: 44px; border-radius: 12px;
+    flex-direction: row; gap: 6px; padding: 0 10px;
+    background: transparent; border: 1px solid transparent;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    color: var(--text-2);
+  }
+  .rail2 i { line-height: 0; }
+  .rail2:active { background: var(--surface-2); transform: none; }
+  .rail2 span { font-size: 12.5px; margin-top: 0; text-shadow: none; }
+  .rail2.like.active { color: #f87171; border-color: transparent; }
+  .rail2.like.active svg { fill: #f87171; }
+  .photo-body { padding: 10px 14px 13px; }
+  .photo-title { font-size: 14px; margin-bottom: 3px; }
+  .photo-meta { margin-bottom: 0; gap: 10px; }
+}
+
+/* Item destruktif di panel opsi: merah + garis pemisah agar tak tersentuh jari
+   saat memilih Unduh/Simpan (di HP tidak ada hover warning seperti desktop). */
+.more-panel .action-btn.danger {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  margin-top: 2px;
+}
+.more-panel .action-btn.danger:hover { background: rgba(248, 113, 113, .08); color: var(--danger); }
+
+/* Toast di halaman auth (login/register) tidak punya bottom nav:
+   kembali ke posisi normal agar tidak melayang janggal di tengah kartu. */
+@media (max-width: 640px) {
+  body.auth-body .toast-stack { bottom: 26px; }
 }

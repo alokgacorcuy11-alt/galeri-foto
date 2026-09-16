@@ -59,7 +59,10 @@ function urlWith(array $over = []): string
 
 $sql = 'SELECT p.*, u.nama_lengkap, u.username, u.verified, al.nama AS album_nama,
                (SELECT COUNT(*) FROM likes l WHERE l.photo_id = p.id) AS jml_like,
-               (SELECT COUNT(*) FROM comments c WHERE c.photo_id = p.id) AS jml_komentar
+               (SELECT COUNT(*) FROM comments c WHERE c.photo_id = p.id) AS jml_komentar,
+               (SELECT COUNT(*) FROM reposts r WHERE r.photo_id = p.id) AS jml_repost,
+               EXISTS (SELECT 1 FROM likes ul WHERE ul.photo_id = p.id AND ul.user_id = ?) AS sudah_like,
+               EXISTS (SELECT 1 FROM saved sl WHERE sl.photo_id = p.id AND sl.user_id = ?) AS sudah_simpan
         FROM photos p
         JOIN users u ON p.user_id = u.id
         LEFT JOIN albums al ON p.album_id = al.id';
@@ -128,13 +131,12 @@ $paramsWhere = $params;
 $typesWhere = $types;
 $offset = ($page - 1) * $perPage;
 $sql .= ' LIMIT ? OFFSET ?';
-$params[] = $perPage;
-$params[] = $offset;
-$types .= 'ii';
+// Dua placeholder SELECT (sudah_like/sudah_simpan) paling depan, lalu WHERE, lalu LIMIT
+$viewerId = (int)$_SESSION['user_id'];
+$typesAll = 'ii' . $types . 'ii';
+$paramsAll = array_merge([$viewerId, $viewerId], $params, [$perPage, $offset]);
 $stmt = $koneksi->prepare($sql);
-if ($params) {
-    $stmt->bind_param($types, ...$params);
-}
+$stmt->bind_param($typesAll, ...$paramsAll);
 $stmt->execute();
 $photos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -236,7 +238,7 @@ layout_header('Galeri');
             <div class="filter-chips" role="group" aria-labelledby="lblUrut">
             <a class="fchip <?= $sort === 'terbaru' ? 'active' : '' ?>" <?= $sort === 'terbaru' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => null])) ?>">Terbaru</a>
             <a class="fchip <?= $sort === 'terlama' ? 'active' : '' ?>" <?= $sort === 'terlama' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => 'terlama'])) ?>">Terlama</a>
-            <a class="fchip <?= $sort === 'populer' ? 'active' : '' ?>" <?= $sort === 'populer' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => 'populer'])) ?>"><?= icon('heart', 13) ?> Terpopuler</a>
+            <a class="fchip <?= $sort === 'populer' ? 'active' : '' ?>" <?= $sort === 'populer' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => 'populer'])) ?>"><?= icon('heart', 13) ?> Populer</a>
             <a class="fchip <?= $sort === 'diskusi' ? 'active' : '' ?>" <?= $sort === 'diskusi' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => 'diskusi'])) ?>"><?= icon('message', 13) ?> Diskusi</a>
             <a class="fchip <?= $sort === 'dilihat' ? 'active' : '' ?>" <?= $sort === 'dilihat' ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['sort' => 'dilihat'])) ?>"><?= icon('eye', 13) ?> Dilihat</a>
             </div>
@@ -252,9 +254,9 @@ layout_header('Galeri');
         <div class="filter-group">
             <span class="filter-label" id="lblTampil">Tampilkan</span>
             <div class="filter-chips" role="group" aria-labelledby="lblTampil">
-            <a class="fchip <?= $mine ? 'active' : '' ?>" <?= $mine ? 'aria-current="true"' : '' ?> href="<?= e($mine ? urlWith(['mine' => null]) : urlWith(['mine' => '1'])) ?>"><?= icon('user', 13) ?> Foto Saya</a>
-            <a class="fchip <?= $sukaSaya ? 'active' : '' ?>" <?= $sukaSaya ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['suka' => $sukaSaya ? null : '1'])) ?>"><?= icon('heart', 13) ?> Disukai</a>
-            <a class="fchip <?= $simpanSaya ? 'active' : '' ?>" <?= $simpanSaya ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['simpan' => $simpanSaya ? null : '1'])) ?>"><?= icon('bookmark', 13) ?> Disimpan</a>
+<a class="fchip <?= $mine ? 'active' : '' ?>" <?= $mine ? 'aria-current="true"' : '' ?> href="<?= e($mine ? urlWith(['mine' => null]) : urlWith(['mine' => '1'])) ?>"><?= icon('user', 13) ?> Saya</a>
+<a class="fchip <?= $sukaSaya ? 'active' : '' ?>" <?= $sukaSaya ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['suka' => $sukaSaya ? null : '1'])) ?>"><?= icon('heart', 13) ?> Suka</a>
+<a class="fchip <?= $simpanSaya ? 'active' : '' ?>" <?= $simpanSaya ? 'aria-current="true"' : '' ?> href="<?= e(urlWith(['simpan' => $simpanSaya ? null : '1'])) ?>"><?= icon('bookmark', 13) ?> Simpan</a>
             </div>
             <?php if (!empty($pengunggah)): ?>
                 <?php
@@ -348,19 +350,49 @@ layout_header('Galeri');
             <?php $cardI = 0; ?>
             <?php foreach ($photos as $photo): ?>
                 <?php
-                    // Jumlah like/komentar sudah dihitung sekali di query utama (tanpa query per kartu).
+                    // Semua angka & status kartu sudah ikut terhitung di query utama (nol query per kartu)
                     $jmlLike     = (int)$photo['jml_like'];
                     $jmlKomentar = (int)$photo['jml_komentar'];
-                    $sudahLike   = hasLiked($photo['id']);
-                    $sudahSimpan = hasSaved($photo['id']);
+                    $jmlRepost   = (int)$photo['jml_repost'];
+                    $sudahLike   = (bool)$photo['sudah_like'];
+                    $sudahSimpan = (bool)$photo['sudah_simpan'];
                     $shareUrl    = 'http' . (($_SERVER['HTTPS'] ?? '') === 'on' ? 's' : '') . '://'
                                   . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME'])
                                   . '/detail.php?id=' . $photo['id'];
                 ?>
                 <article class="photo-card" style="--card-i: <?= $cardI++ ?>">
-                    <a href="detail.php?id=<?= $photo['id'] ?>" class="photo-media">
-                        <img src="uploads/<?= e($photo['filename']) ?>" alt="<?= e($photo['judul']) ?>" loading="lazy">
-                    </a>
+                    <div class="photo-media">
+                        <a href="detail.php?id=<?= $photo['id'] ?>" class="photo-media-link">
+                            <img src="thumb.php?f=<?= urlencode($photo['filename']) ?>&w=640" alt="<?= e($photo['judul']) ?>" loading="lazy">
+                        </a>
+                        <?php /* Rail aksi melayang di foto (khusus HP, gaya TikTok) */ ?>
+                        <div class="photo-rail">
+                        <form method="post" action="like.php" class="action-like-form">
+                            <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
+                            <input type="hidden" name="back" value="<?= e($backSini) ?>">
+                            <button type="submit" class="rail2 like <?= $sudahLike ? 'active' : '' ?>" title="Suka"><i><?= icon('heart', 20) ?></i><span><?= $jmlLike ?></span></button>
+                        </form>
+                        <a class="rail2" href="detail.php?id=<?= $photo['id'] ?>#komentar" title="Komentar"><i><?= icon('message', 20) ?></i><span><?= $jmlKomentar ?></span></a>
+                        <button type="button" class="rail2 share-toggle" data-share="<?= $photo['id'] ?>" title="Bagikan"><i><?= icon('share', 19) ?></i><span><?= $jmlRepost > 0 ? $jmlRepost : 'Bagikan' ?></span></button>
+                        <div class="more-wrap">
+                            <button type="button" class="rail2 more-btn" aria-label="Opsi lainnya" aria-expanded="false" title="Opsi"><i><?= icon('dots', 20) ?></i></button>
+                            <div class="more-panel">
+                                <a href="download.php?id=<?= $photo['id'] ?>" class="action-btn" title="Download gambar"><?= icon('download', 16) ?> <span>Unduh</span></a>
+                                <form method="post" action="save.php" class="action-like-form">
+                                    <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
+                                    <input type="hidden" name="back" value="<?= e($backSini) ?>">
+                                    <button type="submit" class="action-btn save <?= $sudahSimpan ? 'active' : '' ?>" title="<?= $sudahSimpan ? 'Hapus dari simpanan' : 'Simpan foto' ?>" aria-pressed="<?= $sudahSimpan ? 'true' : 'false' ?>"><?= icon('bookmark', 16) ?> <span><?= $sudahSimpan ? 'Batal simpan' : 'Simpan' ?></span></button>
+                                </form>
+                                <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
+                                    <a href="edit.php?id=<?= $photo['id'] ?>" class="action-btn" title="Edit foto"><?= icon('edit', 15) ?> <span>Edit</span></a>
+                                <?php endif; ?>
+                                <?php if (isAdmin()): ?>
+                                    <button type="button" class="action-btn danger" data-del-id="<?= $photo['id'] ?>" data-del-judul="<?= e($photo['judul']) ?>" title="Hapus foto"><?= icon('trash', 15) ?> <span>Hapus</span></button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
                     <div class="photo-body">
                         <h2 class="photo-title"><a href="detail.php?id=<?= $photo['id'] ?>"><?= e($photo['judul']) ?></a></h2>
                         <div class="photo-meta">
@@ -395,20 +427,25 @@ layout_header('Galeri');
                             <button type="button" class="action-btn share-toggle" data-share="<?= $photo['id'] ?>" title="Bagikan">
                                 <?= icon('share', 15) ?>
                             </button>
-                            <a href="download.php?id=<?= $photo['id'] ?>" class="action-btn" title="Download gambar"><?= icon('download', 16) ?></a>
-                            <form method="post" action="save.php" class="action-like-form">
-                                <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
-                                <input type="hidden" name="back" value="<?= e($backSini) ?>">
-                                <button type="submit" class="action-btn save <?= $sudahSimpan ? 'active' : '' ?>"
-                                        title="<?= $sudahSimpan ? 'Hapus dari simpanan' : 'Simpan foto' ?>"
-                                        aria-pressed="<?= $sudahSimpan ? 'true' : 'false' ?>"><?= icon('bookmark', 16) ?></button>
-                            </form>
-                            <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
-                                <a href="edit.php?id=<?= $photo['id'] ?>" class="action-btn" title="Edit foto"><?= icon('edit', 15) ?></a>
-                            <?php endif; ?>
-<?php if (isAdmin()): ?>
-<button type="button" class="action-btn danger" data-del-id="<?= $photo['id'] ?>" data-del-judul="<?= e($photo['judul']) ?>" title="Hapus foto"><?= icon('trash', 15) ?></button>
-<?php endif; ?>
+                            <div class="more-wrap">
+                                <button type="button" class="action-btn more-btn" aria-label="Opsi lainnya" aria-expanded="false" title="Opsi lainnya"><?= icon('dots', 16) ?></button>
+                                <div class="more-panel">
+                                    <a href="download.php?id=<?= $photo['id'] ?>" class="action-btn" title="Download gambar"><?= icon('download', 16) ?> <span>Unduh</span></a>
+                                    <form method="post" action="save.php" class="action-like-form">
+                                        <input type="hidden" name="photo_id" value="<?= $photo['id'] ?>">
+                                        <input type="hidden" name="back" value="<?= e($backSini) ?>">
+                                        <button type="submit" class="action-btn save <?= $sudahSimpan ? 'active' : '' ?>"
+                                                title="<?= $sudahSimpan ? 'Hapus dari simpanan' : 'Simpan foto' ?>"
+                                                aria-pressed="<?= $sudahSimpan ? 'true' : 'false' ?>"><?= icon('bookmark', 16) ?> <span><?= $sudahSimpan ? 'Batal simpan' : 'Simpan' ?></span></button>
+                                    </form>
+                                    <?php if ((int)$photo['user_id'] === (int)$_SESSION['user_id']): ?>
+                                        <a href="edit.php?id=<?= $photo['id'] ?>" class="action-btn" title="Edit foto"><?= icon('edit', 15) ?> <span>Edit</span></a>
+                                    <?php endif; ?>
+                                    <?php if (isAdmin()): ?>
+                                        <button type="button" class="action-btn danger" data-del-id="<?= $photo['id'] ?>" data-del-judul="<?= e($photo['judul']) ?>" title="Hapus foto"><?= icon('trash', 15) ?> <span>Hapus</span></button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                         </div>
                         <?= shareButtons($shareUrl, $photo['judul'], (int)$photo['id'], $backSini) ?>
                     </div>
@@ -425,10 +462,10 @@ layout_header('Galeri');
 </main>
 
 <script>
-    // Toggle baris share di kartu (ala TikTok share sheet)
+    // Toggle baris share di kartu (ala TikTok share sheet) - dari bar bawah ATAU rail foto
     document.querySelectorAll('.share-toggle').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            var row = btn.closest('.photo-body').querySelector('.share-row');
+            var row = btn.closest('.photo-card').querySelector('.share-row');
             row.classList.toggle('open');
         });
     });
@@ -445,6 +482,7 @@ layout_header('Galeri');
                 if (p.hidden) return;
                 p.hidden = true;
                 b.setAttribute('aria-expanded', 'false');
+                p.style.position = ''; p.style.top = ''; p.style.left = ''; p.style.right = '';
                 if (refocusBtn === b) b.focus();
             });
         }
@@ -458,11 +496,27 @@ layout_header('Galeri');
                 if (willOpen) {
                     panel.hidden = false;
                     btn.setAttribute('aria-expanded', 'true');
+                    // HP: baris chip bisa digeser (overflow) -> panel dipaku fixed
+                    // mengikuti posisi tombol, supaya tidak terpotong wadah scroll.
+                    if (window.matchMedia('(max-width: 640px)').matches) {
+                        var r = btn.getBoundingClientRect();
+                        panel.style.position = 'fixed';
+                        panel.style.top = Math.round(r.bottom + 6) + 'px';
+                        panel.style.right = 'auto';
+                        var lx = Math.min(Math.max(12, r.left), Math.max(12, window.innerWidth - panel.offsetWidth - 12));
+                        panel.style.left = Math.round(lx) + 'px';
+                    }
                     var cur = panel.querySelector('[aria-selected="true"]') || panel.querySelector('a');
                     if (cur) cur.focus();
                 }
             });
         });
+        // Geser baris / resize jendela = tutup panel (posisi fixed tak ikut geser)
+        var barEl = document.querySelector('.filter-bar');
+        if (barEl) barEl.addEventListener('scroll', function() {
+            if (document.querySelector('.fselect-panel:not([hidden])')) closeAll(null);
+        });
+        window.addEventListener('resize', function() { closeAll(null); });
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.fselect')) closeAll(null);
         });

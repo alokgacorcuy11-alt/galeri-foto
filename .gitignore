@@ -4,3 +4,6 @@
 !/uploads/.gitkeep
 /uploads/avatars/*
 !/uploads/avatars/.gitkeep
+
+# Dump database lokal: berisi data user, jangan masuk repo publik
+/db-backup-lokal.sql

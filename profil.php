@@ -192,7 +192,7 @@ elseif ($statusProfil === 'pin-batal') layout_alert('Sematan dilepas.', 'success
         <div class="prof-grid">
             <?php foreach ($items as $it): ?>
                 <a class="prof-thumb" href="detail.php?id=<?= (int)$it['id'] ?>" title="<?= e($it['judul']) ?>">
-                    <img src="uploads/<?= e($it['filename']) ?>" alt="<?= e($it['judul']) ?>" loading="lazy">
+                    <img src="thumb.php?f=<?= urlencode($it['filename']) ?>&w=400" alt="<?= e($it['judul']) ?>" loading="lazy">
                     <?php if ($tab === 'repost'): ?>
                         <span class="prof-badge"><?= icon('share', 11) ?> Ulang</span>
                     <?php elseif ($tab === 'postingan' && (int)($it['pinned'] ?? 0) === 1): ?>
